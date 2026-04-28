@@ -1,0 +1,393 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>供佛名牌後台 - GitHub Pages 靜態版</title>
+  <style>
+    :root {
+      --bg: #f7f1e5;
+      --panel: #fffaf0;
+      --ink: #301607;
+      --muted: #7b5a37;
+      --line: #d9bd86;
+      --gold: #b57a18;
+      --brown: #7d5a2e;
+      --red: #8d2c17;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Noto Sans TC", "Microsoft JhengHei", system-ui, sans-serif;
+      color: var(--ink);
+      background: var(--bg);
+    }
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 18px 24px;
+      background: linear-gradient(90deg, #6f210f, #b57a18);
+      color: #fff6d6;
+    }
+    h1 { margin: 0; font-size: 24px; letter-spacing: 0; }
+    main { padding: 20px 24px 36px; }
+    .toolbar, .notice {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+      padding: 14px;
+      margin-bottom: 14px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+    .notice { color: var(--muted); line-height: 1.5; }
+    input, select, textarea, button {
+      font: inherit;
+      border-radius: 6px;
+      border: 1px solid var(--line);
+    }
+    input, select, textarea {
+      padding: 8px 10px;
+      background: #fffdf8;
+      color: var(--ink);
+    }
+    textarea { width: 180px; min-height: 38px; resize: vertical; }
+    button, .link-button {
+      padding: 8px 12px;
+      color: #fff7db;
+      background: var(--gold);
+      border-color: #9b6412;
+      text-decoration: none;
+      cursor: pointer;
+    }
+    button.secondary { background: var(--brown); }
+    button.danger { background: var(--red); }
+    .status { margin-left: auto; color: var(--muted); font-size: 14px; }
+    .table-wrap {
+      overflow: auto;
+      max-height: calc(100vh - 210px);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+    }
+    table { width: 100%; border-collapse: collapse; min-width: 1280px; }
+    th, td {
+      padding: 8px;
+      border-bottom: 1px solid rgba(181, 122, 24, 0.22);
+      vertical-align: top;
+      white-space: nowrap;
+    }
+    th {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      background: #ead4a2;
+      text-align: left;
+      font-weight: 800;
+    }
+    td input[type="text"] { width: 150px; }
+    td input[type="date"] { width: 136px; }
+    .small { color: var(--muted); font-size: 13px; }
+    .hidden-file { display: none; }
+    #fileProtocolNotice {
+      position: fixed;
+      left: 50%;
+      bottom: 18px;
+      z-index: 80;
+      display: none;
+      width: min(720px, calc(100vw - 32px));
+      transform: translateX(-50%);
+      padding: 14px 16px;
+      border: 1px solid rgba(255, 235, 178, 0.72);
+      border-radius: 12px;
+      background: rgba(52, 18, 7, 0.94);
+      color: #fff4cf;
+      box-shadow: 0 16px 40px rgba(0,0,0,0.38);
+      line-height: 1.55;
+      font-size: 14px;
+    }
+    #fileProtocolNotice strong { color: #fff8df; }
+    #fileProtocolNotice button {
+      float: right;
+      margin-left: 12px;
+      padding: 5px 10px;
+      border: 1px solid rgba(255, 235, 178, 0.68);
+      border-radius: 999px;
+      background: linear-gradient(180deg, #fff1b8, #d39a31);
+      color: #2d1604;
+      font-weight: 800;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div id="fileProtocolNotice" role="status" aria-live="polite">
+    <button type="button" aria-label="關閉提示" onclick="this.parentElement.style.display='none'">關閉</button>
+    <strong>請使用本機伺服器開啟此頁，不要直接雙擊 HTML。</strong><br/>
+    請在資料夾中執行 <code>python -m http.server 8090</code>，然後打開 <code>http://localhost:8090</code>。
+  </div>
+  <script>
+    if (location.protocol === "file:") {
+      document.getElementById("fileProtocolNotice").style.display = "block";
+    }
+  </script>
+  <header>
+    <h1>供佛名牌後台</h1>
+    <a class="link-button" href="./index.html">回到佛堂</a>
+  </header>
+
+  <main>
+    <section class="toolbar">
+      <input id="searchInput" type="search" placeholder="搜尋姓名、佛像、區域、左右側" />
+      <select id="sideFilter">
+        <option value="">全部側邊</option>
+        <option value="left">左側</option>
+        <option value="right">右側</option>
+      </select>
+      <button id="reloadBtn" type="button" class="secondary">重新載入</button>
+      <button id="saveBtn" type="button">儲存全部</button>
+      <button id="exportBtn" type="button" class="secondary">匯出 JSON</button>
+      <button id="importBtn" type="button" class="secondary">匯入 JSON</button>
+      <input id="importFile" class="hidden-file" type="file" accept="application/json,.json" />
+      <button id="resetBtn" type="button" class="danger">重設為「善信供養」</button>
+      <span id="status" class="status">準備中</span>
+    </section>
+
+    <section id="modeNotice" class="notice">
+      目前為 GitHub Pages 靜態模式，資料只會儲存在本瀏覽器 localStorage；若要多人共享，請使用後端版本或另接資料庫。
+    </section>
+
+    <section class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>側邊</th>
+            <th>區域</th>
+            <th>佛像</th>
+            <th>位置</th>
+            <th>供養人姓名</th>
+            <th>祈願文字</th>
+            <th>起始日</th>
+            <th>到期日</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="offeringsBody"></tbody>
+      </table>
+    </section>
+  </main>
+
+  <script>
+    const STORAGE_KEY = "shrineOfferings";
+    const CHANNEL_NAME = "shrine-offerings-updates";
+    const DEFAULT_SPONSOR = "善信供養";
+    const STATIC_DATA_PATH = "assets/data/shrine_offerings.json";
+    const STATIC_MODE_NOTICE = "目前為 GitHub Pages 靜態模式，資料只會儲存在本瀏覽器 localStorage；若要多人共享，請使用後端版本或另接資料庫。";
+    const SHRINE_ZONES = {
+      left: [
+        { deity: "藥師佛", cols: 6, title: "藥師佛區" },
+        { deity: "阿彌陀佛", cols: 6, title: "阿彌陀佛區" },
+        { deity: "蓮花生大士", cols: 6, title: "蓮師區" },
+        { deity: "文殊菩薩", cols: 6, title: "文殊區" },
+        { deity: "綠度母", cols: 6, title: "綠度母區" }
+      ],
+      right: [
+        { deity: "釋迦牟尼佛", cols: 6, title: "佛陀區" },
+        { deity: "金剛薩埵", cols: 6, title: "金剛薩埵區" },
+        { deity: "四臂觀音", cols: 6, title: "觀音區" },
+        { deity: "地藏王菩薩", cols: 6, title: "地藏區" },
+        { deity: "黃財神", cols: 6, title: "黃財神區" }
+      ]
+    };
+
+    let offerings = [];
+    const body = document.getElementById("offeringsBody");
+    const statusEl = document.getElementById("status");
+    const modeNotice = document.getElementById("modeNotice");
+    const searchInput = document.getElementById("searchInput");
+    const sideFilter = document.getElementById("sideFilter");
+
+    function makeOfferingId(sideName, zoneIndex, row, col) {
+      return `${sideName}-zone-${String(zoneIndex + 1).padStart(2, "0")}-row-${String(row + 1).padStart(2, "0")}-col-${String(col + 1).padStart(2, "0")}`;
+    }
+
+    function buildDefaultOfferings() {
+      const result = [];
+      ["left", "right"].forEach((sideName) => {
+        let colStart = 0;
+        SHRINE_ZONES[sideName].forEach((zone, zoneIndex) => {
+          for (let localCol = 0; localCol < zone.cols; localCol++) {
+            const col = colStart + localCol;
+            for (let row = 0; row < 3; row++) {
+              result.push({
+                id: makeOfferingId(sideName, zoneIndex, row, col),
+                side: sideName,
+                row,
+                col,
+                zone: zone.title,
+                deity: zone.deity,
+                sponsorName: DEFAULT_SPONSOR,
+                wishText: "",
+                startDate: null,
+                endDate: null
+              });
+            }
+          }
+          colStart += zone.cols;
+        });
+      });
+      return result;
+    }
+
+    function normalize(item) {
+      return {
+        ...item,
+        sponsorName: String(item.sponsorName || DEFAULT_SPONSOR).trim() || DEFAULT_SPONSOR,
+        wishText: String(item.wishText || ""),
+        startDate: item.startDate || null,
+        endDate: item.endDate || null
+      };
+    }
+
+    function mergeData(base, incoming) {
+      const byId = new Map((Array.isArray(incoming) ? incoming : []).map((item) => [item.id, normalize(item)]));
+      return base.map((item) => normalize({ ...item, ...(byId.get(item.id) || {}) }));
+    }
+
+    function escapeHtml(value) {
+      return String(value || "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;");
+    }
+
+    function filteredOfferings() {
+      const q = searchInput.value.trim().toLowerCase();
+      const side = sideFilter.value;
+      return offerings.filter((item) => {
+        if (side && item.side !== side) return false;
+        if (!q) return true;
+        return [item.id, item.side, item.zone, item.deity, item.sponsorName, item.wishText]
+          .some((value) => String(value || "").toLowerCase().includes(q));
+      });
+    }
+
+    function render() {
+      const rows = filteredOfferings();
+      body.innerHTML = "";
+      rows.forEach((item) => {
+        const tr = document.createElement("tr");
+        tr.dataset.id = item.id;
+        tr.innerHTML = `
+          <td><span class="small">${item.id}</span></td>
+          <td>${item.side === "left" ? "左" : "右"}</td>
+          <td>${item.zone}</td>
+          <td>${item.deity}</td>
+          <td>第 ${item.row + 1} 排 / 第 ${item.col + 1} 欄</td>
+          <td><input data-field="sponsorName" type="text" value="${escapeHtml(item.sponsorName)}" /></td>
+          <td><textarea data-field="wishText">${escapeHtml(item.wishText)}</textarea></td>
+          <td><input data-field="startDate" type="date" value="${item.startDate || ""}" /></td>
+          <td><input data-field="endDate" type="date" value="${item.endDate || ""}" /></td>
+          <td><button type="button" class="secondary" data-reset-one>重設</button></td>
+        `;
+        body.appendChild(tr);
+      });
+      statusEl.textContent = `顯示 ${rows.length} / ${offerings.length} 格`;
+    }
+
+    function syncFromTable() {
+      body.querySelectorAll("tr[data-id]").forEach((tr) => {
+        const item = offerings.find((entry) => entry.id === tr.dataset.id);
+        if (!item) return;
+        tr.querySelectorAll("[data-field]").forEach((input) => {
+          item[input.dataset.field] = input.value || (input.dataset.field === "sponsorName" ? DEFAULT_SPONSOR : null);
+        });
+      });
+    }
+
+    async function loadData() {
+      const defaults = buildDefaultOfferings();
+      let staticData = [];
+      try {
+        const response = await fetch(STATIC_DATA_PATH, { cache: "no-store" });
+        if (response.ok) staticData = await response.json();
+      } catch (error) {
+      }
+      try {
+        const localData = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+        offerings = mergeData(mergeData(defaults, staticData), localData);
+      } catch (error) {
+        offerings = mergeData(defaults, staticData);
+      }
+      modeNotice.textContent = STATIC_MODE_NOTICE;
+      render();
+    }
+
+    function publishUpdate() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(offerings));
+      try {
+        new BroadcastChannel(CHANNEL_NAME).postMessage({ type: "shrine-offerings-updated", offerings });
+      } catch (error) {
+      }
+    }
+
+    async function saveAll() {
+      syncFromTable();
+      publishUpdate();
+      render();
+      modeNotice.textContent = STATIC_MODE_NOTICE;
+      statusEl.textContent = "已儲存到 localStorage";
+    }
+
+    function exportJson() {
+      syncFromTable();
+      const blob = new Blob([JSON.stringify(offerings, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "shrine_offerings.json";
+      link.click();
+      URL.revokeObjectURL(url);
+    }
+
+    document.getElementById("saveBtn").addEventListener("click", saveAll);
+    document.getElementById("reloadBtn").addEventListener("click", loadData);
+    document.getElementById("exportBtn").addEventListener("click", exportJson);
+    document.getElementById("importBtn").addEventListener("click", () => document.getElementById("importFile").click());
+    document.getElementById("resetBtn").addEventListener("click", () => {
+      offerings = offerings.map((item) => ({ ...item, sponsorName: DEFAULT_SPONSOR, wishText: "", startDate: null, endDate: null }));
+      publishUpdate();
+      render();
+    });
+    document.getElementById("importFile").addEventListener("change", async (event) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      offerings = mergeData(buildDefaultOfferings(), JSON.parse(await file.text()));
+      publishUpdate();
+      render();
+      statusEl.textContent = "已匯入 JSON";
+      event.target.value = "";
+    });
+    body.addEventListener("click", (event) => {
+      if (!event.target.matches("[data-reset-one]")) return;
+      const item = offerings.find((entry) => entry.id === event.target.closest("tr[data-id]")?.dataset.id);
+      if (!item) return;
+      item.sponsorName = DEFAULT_SPONSOR;
+      item.wishText = "";
+      item.startDate = null;
+      item.endDate = null;
+      render();
+    });
+    searchInput.addEventListener("input", render);
+    sideFilter.addEventListener("change", render);
+
+    loadData();
+  </script>
+</body>
+</html>

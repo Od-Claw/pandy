@@ -121,7 +121,7 @@ def page_shell(title: str, timestamp: str, count: int, unavailable: int, body: s
 <html lang=\"zh-TW\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">
 <title>{html.escape(title)}</title><style>
 :root{{--bg:#f5f7fa;--panel:#fff;--text:#1f2937;--muted:#64748b;--border:#d7dee8;--accent:#1f7a4f;--soft:#e9f6ef;--danger:#c2410c}}*{{box-sizing:border-box}}body{{margin:0;background:var(--bg);color:var(--text);font-family:Arial,\"Microsoft JhengHei\",sans-serif}}main{{width:min(1120px,calc(100% - 32px));margin:28px auto}}header{{display:flex;align-items:end;justify-content:space-between;gap:16px;margin-bottom:16px}}h1{{margin:0 0 6px;font-size:clamp(24px,3vw,34px)}}.meta{{color:var(--muted);font-size:14px}}.summary{{display:flex;gap:8px;flex-wrap:wrap}}.badge{{border:1px solid var(--border);border-radius:6px;background:var(--panel);padding:7px 10px;font-size:14px}}.wrap{{overflow-x:auto;border-radius:8px;box-shadow:0 8px 24px rgba(15,23,42,.08)}}table{{width:100%;border-collapse:collapse;background:var(--panel)}}th,td{{padding:10px 12px;border-bottom:1px solid var(--border);text-align:left;white-space:nowrap}}th{{position:sticky;top:0;background:var(--accent);color:#fff}}tbody tr:nth-child(even){{background:#fbfcfd}}tbody tr:hover{{background:var(--soft)}}.price,.number{{text-align:right;font-variant-numeric:tabular-nums}}.price{{font-weight:700}}.no-price{{color:var(--danger);font-weight:700}}.positive{{color:#b91c1c;font-weight:700}}.negative{{color:#047857;font-weight:700}}@media(max-width:720px){{header{{display:block}}.summary{{margin-top:10px}}th,td{{padding:9px 10px}}}}
-</style></head><body><main><header><div><h1>{html.escape(title)}</h1><div class=\"meta\">?湔??嚗timestamp} 嚚?鞈?靘?嚗WSE MIS嚗ahoo ??嚗?/div></div><div class=\"summary\"><div class=\"badge\">蝑嚗count}</div><div class=\"badge\">?芸?敺?{unavailable}</div></div></header><div class=\"wrap\"><table>{body}</table></div></main></body></html>\n"""
+</style></head><body><main><header><div><h1>{html.escape(title)}</h1><div class=\"meta\">更新時間：{timestamp} ｜ 資料來源：TWSE MIS（Yahoo 指數備援）</div></div><div class=\"summary\"><div class=\"badge\">筆數：{count}</div><div class=\"badge\">未取得：{unavailable}</div></div></header><div class=\"wrap\"><table>{body}</table></div></main></body></html>\n"""
 
 
 def render_quote_page(title: str, entries: list[dict[str, str]], quotes: dict[str, float], timestamp: str) -> str:
@@ -138,7 +138,7 @@ def render_quote_page(title: str, entries: list[dict[str, str]], quotes: dict[st
         else:
             price = price_text(value)
         rows.append(f"<tr><td>{name}</td><td class=\"price\">{price}</td></tr>")
-    body = "<thead><tr><th>?迂</th><th>?∪</th></tr></thead><tbody>" + "\n".join(rows) + "</tbody>"
+    body = "<thead><tr><th>名稱</th><th>股價</th></tr></thead><tbody>" + "\n".join(rows) + "</tbody>"
     return page_shell(title, timestamp, len(entries), missing, body)
 
 
@@ -165,9 +165,9 @@ def render_prof_page(rows: list[list[str]], quotes: dict[str, float], timestamp:
                 cls = f"number {performance_class}"
             cells.append(f"<td class=\"{cls}\">{html.escape(value)}</td>")
         rendered.append("<tr>" + "".join(cells) + "</tr>")
-    header = "<thead><tr><th>?∟?</th><th>?∠巨?迂</th><th>?曉</th><th>?摯?∪</th><th>?摯畾??/th><th>????靘?/th><th>12??1?亥??/th><th>隞僑蝮暹?</th><th>?斗???/th></tr></thead>"
+    header = "<thead><tr><th>股號</th><th>股票名稱</th><th>現價</th><th>預估股利</th><th>預估殖利率</th><th>應持有比例</th><th>12月31日股價</th><th>今年績效</th><th>除權息</th></tr></thead>"
     body = header + "<tbody>" + "\n".join(rendered) + "</tbody>"
-    return page_shell("畾????, timestamp, len(rendered), sum("-" in item for item in rendered), body)
+    return page_shell("殖利率資料", timestamp, len(rendered), sum("-" in item for item in rendered), body)
 
 
 def main() -> int:
@@ -184,8 +184,8 @@ def main() -> int:
     quotes = quote_map(watchlists, prof_rows)
     timestamp = dt.datetime.now(TAIPEI).strftime("%Y-%m-%d %H:%M:%S")
     pages = {
-        "pandy_data.html": render_quote_page("Pandorabox ?∠巨?∪?湔", watchlists["pandy"], quotes, timestamp),
-        "stock_data.html": render_quote_page("?∠巨?∪?湔", watchlists["stock"], quotes, timestamp),
+        "pandy_data.html": render_quote_page("Pandorabox 股票股價更新", watchlists["pandy"], quotes, timestamp),
+        "stock_data.html": render_quote_page("股票股價更新", watchlists["stock"], quotes, timestamp),
         "prof_data.html": render_prof_page(prof_rows, quotes, timestamp),
     }
     if not args.dry_run:

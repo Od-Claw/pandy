@@ -1,244 +1,128 @@
 <!DOCTYPE html>
-<html lang="zh-TW">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>股票股價更新</title>
-    <style>
-        :root {
-            color-scheme: light;
-            --bg: #f5f7fa;
-            --panel: #ffffff;
-            --text: #1f2937;
-            --muted: #64748b;
-            --border: #d7dee8;
-            --accent: #1f7a4f;
-            --accent-soft: #e9f6ef;
-            --danger: #c2410c;
-        }
-        * { box-sizing: border-box; }
-        body {
-            margin: 0;
-            background: var(--bg);
-            color: var(--text);
-            font-family: Arial, "Microsoft JhengHei", "PingFang TC", sans-serif;
-        }
-        main {
-            width: min(1120px, calc(100% - 32px));
-            margin: 28px auto;
-        }
-        header {
-            display: flex;
-            align-items: end;
-            justify-content: space-between;
-            gap: 16px;
-            margin-bottom: 16px;
-        }
-        h1 {
-            margin: 0 0 6px;
-            font-size: clamp(24px, 3vw, 34px);
-            line-height: 1.2;
-        }
-        .meta {
-            color: var(--muted);
-            font-size: 14px;
-        }
-        .summary {
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-            justify-content: flex-end;
-        }
-        .badge {
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            background: var(--panel);
-            padding: 7px 10px;
-            font-size: 14px;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            background: var(--panel);
-            border: 1px solid var(--border);
-        }
-        th, td {
-            padding: 10px 12px;
-            border-bottom: 1px solid var(--border);
-            text-align: left;
-            white-space: nowrap;
-        }
-        th {
-            position: sticky;
-            top: 0;
-            background: var(--accent);
-            color: white;
-            font-weight: 700;
-        }
-        tbody tr:nth-child(even) { background: #fbfcfd; }
-        tbody tr:hover { background: var(--accent-soft); }
-        a { color: #1d4ed8; text-decoration: none; }
-        a:hover { text-decoration: underline; }
-        .price {
-            text-align: right;
-            font-weight: 700;
-            font-variant-numeric: tabular-nums;
-        }
-        .no-price {
-            color: var(--danger);
-            font-weight: 700;
-        }
-        .return {
-            text-align: right;
-            font-weight: 700;
-            font-variant-numeric: tabular-nums;
-        }
-        .positive { color: #b91c1c; }
-        .negative { color: #047857; }
-        .table-wrap {
-            overflow-x: auto;
-            border-radius: 8px;
-            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
-        }
-        @media (max-width: 720px) {
-            header { display: block; }
-            .summary { justify-content: flex-start; margin-top: 10px; }
-            th, td { padding: 9px 10px; }
-        }
-    </style>
-</head>
-<body>
-    <main>
-        <header>
-            <div>
-                <h1>股票股價更新</h1>
-                <div class="meta">更新時間：2026-07-10 13:46:52 ｜ 資料來源：Yahoo 股市</div>
-            </div>
-            <div class="summary">
-                <div class="badge">筆數：111</div>
-                <div class="badge">未取得：0</div>
-            </div>
-        </header>
-        <div class="table-wrap">
-            <table>
-                <thead>
-                    <tr><th>名稱</th><th>股價</th></tr>
-                </thead>
-                <tbody>
-        <tr><td>大統益</td><td class="price">145.5</td></tr>
-        <tr><td>聯華</td><td class="price">40.10</td></tr>
-        <tr><td>大成</td><td class="price">57.0</td></tr>
-        <tr><td>卜蜂</td><td class="price">112.0</td></tr>
-        <tr><td>惠普</td><td class="price">68.9</td></tr>
-        <tr><td>統一</td><td class="price">78.4</td></tr>
-        <tr><td>臺慶科</td><td class="price">275.0</td></tr>
-        <tr><td>興農</td><td class="price">39.60</td></tr>
-        <tr><td>聯華食</td><td class="price">86.4</td></tr>
-        <tr><td>佳格</td><td class="price">29.75</td></tr>
-        <tr><td>中華食</td><td class="price">73.5</td></tr>
-        <tr><td>黑松</td><td class="price">33.20</td></tr>
-        <tr><td>茂生</td><td class="price">57.8</td></tr>
-        <tr><td>杏昌</td><td class="price">129.5</td></tr>
-        <tr><td>生達</td><td class="price">63.9</td></tr>
-        <tr><td>中化</td><td class="price">35.20</td></tr>
-        <tr><td>太醫</td><td class="price">81.3</td></tr>
-        <tr><td>中聯資</td><td class="price">63.4</td></tr>
-        <tr><td>佳醫</td><td class="price">69.8</td></tr>
-        <tr><td>邦特</td><td class="price">117.0</td></tr>
-        <tr><td>健喬</td><td class="price">33.35</td></tr>
-        <tr><td>中興電</td><td class="price">168.5</td></tr>
-        <tr><td>華固</td><td class="price">101.0</td></tr>
-        <tr><td>根基</td><td class="price">92.2</td></tr>
-        <tr><td>潤弘</td><td class="price">168.5</td></tr>
-        <tr><td>達欣工</td><td class="price">88.5</td></tr>
-        <tr><td>台泥</td><td class="price">22.70</td></tr>
-        <tr><td>巨路</td><td class="price">120.0</td></tr>
-        <tr><td>長榮鋼</td><td class="price">95.0</td></tr>
-        <tr><td>崑鼎</td><td class="price">274.0</td></tr>
-        <tr><td>可寧衛</td><td class="price">27.00</td></tr>
-        <tr><td>櫻花</td><td class="price">83.5</td></tr>
-        <tr><td>日友</td><td class="price">76.6</td></tr>
-        <tr><td>崇友</td><td class="price">123.0</td></tr>
-        <tr><td>鋼聯</td><td class="price">106.5</td></tr>
-        <tr><td>捷流閥業</td><td class="price">81.4</td></tr>
-        <tr><td>茂順</td><td class="price">120.0</td></tr>
-        <tr><td>世豐</td><td class="price">32.50</td></tr>
-        <tr><td>永記</td><td class="price">78.8</td></tr>
-        <tr><td>永豐實</td><td class="price">40.60</td></tr>
-        <tr><td>中租-KY</td><td class="price">114.5</td></tr>
-        <tr><td>裕融</td><td class="price">81.0</td></tr>
-        <tr><td>和潤</td><td class="price">59.4</td></tr>
-        <tr><td>兆豐金</td><td class="price">46.70</td></tr>
-        <tr><td>台中銀</td><td class="price">20.60</td></tr>
-        <tr><td>台積電</td><td class="price">2,415</td></tr>
-        <tr><td>崇越</td><td class="price">509</td></tr>
-        <tr><td>中美晶</td><td class="price">210.5</td></tr>
-        <tr><td>信邦</td><td class="price">326.0</td></tr>
-        <tr><td>華立</td><td class="price">117.5</td></tr>
-        <tr><td>神基</td><td class="price">112.0</td></tr>
-        <tr><td>晶焱</td><td class="price">97.0</td></tr>
-        <tr><td>大聯大</td><td class="price">106.5</td></tr>
-        <tr><td>聯強</td><td class="price">88.5</td></tr>
-        <tr><td>中菲</td><td class="price">94.4</td></tr>
-        <tr><td>精誠</td><td class="price">143.5</td></tr>
-        <tr><td>文曄</td><td class="price">211.5</td></tr>
-        <tr><td>日電貿</td><td class="price">286.5</td></tr>
-        <tr><td>關貿</td><td class="price">90.2</td></tr>
-        <tr><td>零壹</td><td class="price">103.0</td></tr>
-        <tr><td>邁達特</td><td class="price">44.35</td></tr>
-        <tr><td>普萊德</td><td class="price">167.0</td></tr>
-        <tr><td>三福化</td><td class="price">131.5</td></tr>
-        <tr><td>達興材</td><td class="price">380.5</td></tr>
-        <tr><td>桂盟</td><td class="price">86.5</td></tr>
-        <tr><td>中菲行</td><td class="price">78.9</td></tr>
-        <tr><td>台驊</td><td class="price">70.5</td></tr>
-        <tr><td>元大金</td><td class="price">68.3</td></tr>
-        <tr><td>中信金</td><td class="price">69.9</td></tr>
-        <tr><td>永豐金</td><td class="price">40.45</td></tr>
-        <tr><td>花仙子</td><td class="price">51.3</td></tr>
-        <tr><td>永信</td><td class="price">54.6</td></tr>
-        <tr><td>聚鼎</td><td class="price">74.5</td></tr>
-        <tr><td>世鎧</td><td class="price">24.20</td></tr>
-        <tr><td>泰山</td><td class="price">16.85</td></tr>
-        <tr><td>生泰</td><td class="price">75.3</td></tr>
-        <tr><td>晟德</td><td class="price">38.95</td></tr>
-        <tr><td>嘉泥</td><td class="price">13.40</td></tr>
-        <tr><td>福壽</td><td class="price">12.20</td></tr>
-        <tr><td>凌群</td><td class="price">53.7</td></tr>
-        <tr><td>旭富</td><td class="price">45.50</td></tr>
-        <tr><td>承業醫</td><td class="price">29.00</td></tr>
-        <tr><td>盛弘</td><td class="price">19.30</td></tr>
-        <tr><td>新鼎</td><td class="price">158.5</td></tr>
-        <tr><td>凡甲</td><td class="price">312.5</td></tr>
-        <tr><td>信紘科</td><td class="price">255.0</td></tr>
-        <tr><td>開發金</td><td class="price">30.05</td></tr>
-        <tr><td>美吾華</td><td class="price">20.65</td></tr>
-        <tr><td>南僑</td><td class="price">32.60</td></tr>
-        <tr><td>漢科</td><td class="price">143.0</td></tr>
-        <tr><td>長榮航太</td><td class="price">240.0</td></tr>
-        <tr><td>美時</td><td class="price">204.0</td></tr>
-        <tr><td>致伸</td><td class="price">68.8</td></tr>
-        <tr><td>力泰</td><td class="price">82.3</td></tr>
-        <tr><td>耕興</td><td class="price">206.0</td></tr>
-        <tr><td>台汽電</td><td class="price">76.0</td></tr>
-        <tr><td>資通</td><td class="price">53.2</td></tr>
-        <tr><td>皇家可口</td><td class="price">62.3</td></tr>
-        <tr><td>中保科</td><td class="price">107.5</td></tr>
-        <tr><td>大東電</td><td class="price">226.5</td></tr>
-        <tr><td>三商餐飲</td><td class="price">30.50</td></tr>
-        <tr><td>台灣積層</td><td class="price">37.27</td></tr>
-        <tr><td>青新-創</td><td class="price">78.7</td></tr>
-        <tr><td>悠遊卡</td><td class="price">52.9</td></tr>
-        <tr><td>南光</td><td class="price">31.80</td></tr>
-        <tr><td>南寶</td><td class="price">339.5</td></tr>
-        <tr><td>穩得</td><td class="price">181.0</td></tr>
-        <tr><td>溫士頓</td><td class="price">60.1</td></tr>
-        <tr><td>欣陸</td><td class="price">20.60</td></tr>
-        <tr><td>大盤</td><td class="price">45,354.61</td></tr>
-        <tr><td>50</td><td class="price">105.80</td></tr>
-                </tbody>
-            </table>
-        </div>
-    </main>
-</body>
-</html>
+<html lang="zh-TW"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>股票股價更新</title><style>
+:root{--bg:#f5f7fa;--panel:#fff;--text:#1f2937;--muted:#64748b;--border:#d7dee8;--accent:#1f7a4f;--soft:#e9f6ef;--danger:#c2410c}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:Arial,"Microsoft JhengHei",sans-serif}main{width:min(1120px,calc(100% - 32px));margin:28px auto}header{display:flex;align-items:end;justify-content:space-between;gap:16px;margin-bottom:16px}h1{margin:0 0 6px;font-size:clamp(24px,3vw,34px)}.meta{color:var(--muted);font-size:14px}.summary{display:flex;gap:8px;flex-wrap:wrap}.badge{border:1px solid var(--border);border-radius:6px;background:var(--panel);padding:7px 10px;font-size:14px}.wrap{overflow-x:auto;border-radius:8px;box-shadow:0 8px 24px rgba(15,23,42,.08)}table{width:100%;border-collapse:collapse;background:var(--panel)}th,td{padding:10px 12px;border-bottom:1px solid var(--border);text-align:left;white-space:nowrap}th{position:sticky;top:0;background:var(--accent);color:#fff}tbody tr:nth-child(even){background:#fbfcfd}tbody tr:hover{background:var(--soft)}.price,.number{text-align:right;font-variant-numeric:tabular-nums}.price{font-weight:700}.no-price{color:var(--danger);font-weight:700}.positive{color:#b91c1c;font-weight:700}.negative{color:#047857;font-weight:700}@media(max-width:720px){header{display:block}.summary{margin-top:10px}th,td{padding:9px 10px}}
+</style></head><body><main><header><div><h1>股票股價更新</h1><div class="meta">更新時間：2026-07-15 13:52:40 ｜ 資料來源：TWSE MIS（Yahoo 指數備援）</div></div><div class="summary"><div class="badge">筆數：111</div><div class="badge">未取得：3</div></div></header><div class="wrap"><table><thead><tr><th>名稱</th><th>股價</th></tr></thead><tbody><tr><td>大統益</td><td class="price">152</td></tr>
+<tr><td>聯華</td><td class="price">40.5</td></tr>
+<tr><td>大成</td><td class="price">58</td></tr>
+<tr><td>卜蜂</td><td class="price">112</td></tr>
+<tr><td>惠普</td><td class="price">68.8</td></tr>
+<tr><td>統一</td><td class="price">78.6</td></tr>
+<tr><td>臺慶科</td><td class="price">250</td></tr>
+<tr><td>興農</td><td class="price">39.5</td></tr>
+<tr><td>聯華食</td><td class="price">88.2</td></tr>
+<tr><td>佳格</td><td class="price">30.1</td></tr>
+<tr><td>中華食</td><td class="price">73</td></tr>
+<tr><td>黑松</td><td class="price">33.8</td></tr>
+<tr><td>茂生</td><td class="price">55.1</td></tr>
+<tr><td>杏昌</td><td class="price">130</td></tr>
+<tr><td>生達</td><td class="price">64.3</td></tr>
+<tr><td>中化</td><td class="price">34.8</td></tr>
+<tr><td>太醫</td><td class="price">77.4</td></tr>
+<tr><td>中聯資</td><td class="price">63.7</td></tr>
+<tr><td>佳醫</td><td class="price">72.3</td></tr>
+<tr><td>邦特</td><td class="price">118</td></tr>
+<tr><td>健喬</td><td class="price">33.6</td></tr>
+<tr><td>中興電</td><td class="price">171</td></tr>
+<tr><td>華固</td><td class="price">101.5</td></tr>
+<tr><td>根基</td><td class="price">95.7</td></tr>
+<tr><td>潤弘</td><td class="price">164.5</td></tr>
+<tr><td>達欣工</td><td class="price">88.1</td></tr>
+<tr><td>台泥</td><td class="price">23.55</td></tr>
+<tr><td>巨路</td><td class="price">120.5</td></tr>
+<tr><td>長榮鋼</td><td class="price">95.5</td></tr>
+<tr><td>崑鼎</td><td class="price">270.5</td></tr>
+<tr><td>可寧衛</td><td class="price">26.45</td></tr>
+<tr><td>櫻花</td><td class="price">83.9</td></tr>
+<tr><td>日友</td><td class="price">76.2</td></tr>
+<tr><td>崇友</td><td class="price">122.5</td></tr>
+<tr><td>鋼聯</td><td class="price">108</td></tr>
+<tr><td>捷流閥業</td><td class="price">81.7</td></tr>
+<tr><td>茂順</td><td class="price">122.5</td></tr>
+<tr><td>世豐</td><td class="price">32.2</td></tr>
+<tr><td>永記</td><td class="price">79.5</td></tr>
+<tr><td>永豐實</td><td class="price">38.6</td></tr>
+<tr><td>中租-KY</td><td class="price">119</td></tr>
+<tr><td>裕融</td><td class="price">82.7</td></tr>
+<tr><td>和潤</td><td class="price">60.4</td></tr>
+<tr><td>兆豐金</td><td class="price">46</td></tr>
+<tr><td>台中銀</td><td class="price">20.3</td></tr>
+<tr><td>台積電</td><td class="price">2,440</td></tr>
+<tr><td>崇越</td><td class="price">556</td></tr>
+<tr><td>中美晶</td><td class="price">278</td></tr>
+<tr><td>信邦</td><td class="price">321.5</td></tr>
+<tr><td>華立</td><td class="price">120.5</td></tr>
+<tr><td>神基</td><td class="price">115.5</td></tr>
+<tr><td>晶焱</td><td class="price">88.7</td></tr>
+<tr><td>大聯大</td><td class="price">116.5</td></tr>
+<tr><td>聯強</td><td class="price">87.2</td></tr>
+<tr><td>中菲</td><td class="price">94.3</td></tr>
+<tr><td>精誠</td><td class="price">141</td></tr>
+<tr><td>文曄</td><td class="price">200</td></tr>
+<tr><td>日電貿</td><td class="price">225</td></tr>
+<tr><td>關貿</td><td class="price">90.9</td></tr>
+<tr><td>零壹</td><td class="price">103</td></tr>
+<tr><td>邁達特</td><td class="price">43.65</td></tr>
+<tr><td>普萊德</td><td class="price">157.5</td></tr>
+<tr><td>三福化</td><td class="price">137</td></tr>
+<tr><td>達興材</td><td class="price">376</td></tr>
+<tr><td>桂盟</td><td class="price">90.4</td></tr>
+<tr><td>中菲行</td><td class="price">79.3</td></tr>
+<tr><td>台驊</td><td class="price">64.3</td></tr>
+<tr><td>元大金</td><td class="price">67</td></tr>
+<tr><td>中信金</td><td class="price">63.5</td></�:��$z{-���jם="number positive">129.38%</td><td class="">尚未公布</td></tr>
+<tr><td class="">6592</td><td class="">和潤</td><td class="number">60.4</td><td class="number">3.00</td><td class="number">4.97%</td><td class="number">1.25%</td><td class="number">59.90</td><td class="number positive">0.83%</td><td class="">6/30預計配息</td></tr>
+<tr><td class="">1752</td><td class="">南光</td><td class="number">31.9</td><td class="number">1.60</td><td class="number">5.02%</td><td class="number">0.25%</td><td class="number">37.30</td><td class="number negative">-14.48%</td><td class="">7/2預計配息</td></tr>
+<tr><td class="">1702</td><td class="">鋼聯</td><td class="number">33.75</td><td class="number">5.30</td><td class="number">15.70%</td><td class="number">0.50%</td><td class="number">106.00</td><td class="number negative">-68.16%</td><td class="">3/27已配息</td></tr>
+<tr><td class="">1731</td><td class="">黑松</td><td class="number">20.75</td><td class="number">1.65</td><td class="number">7.95%</td><td class="number">0.25%</td><td class="number">38.00</td><td class="number negative">-45.39%</td><td class="">6/29預計配息</td></tr>
+<tr><td class="">2063</td><td class="">世鎧</td><td class="number">24.05</td><td class="number">1.20</td><td class="number">4.99%</td><td class="number">0.00%</td><td class="number">24.25</td><td class="number negative">-0.82%</td><td class="">尚未公布</td></tr>
+<tr><td class="">1232</td><td class="">大統益</td><td class="number">152</td><td class="number">7.20</td><td class="number">4.74%</td><td class="number">7.00%</td><td class="number">144.50</td><td class="number positive">5.19%</td><td class="">6/15已配息</td></tr>
+<tr><td class="">1702</td><td class="">南僑</td><td class="number">33.75</td><td class="number">1.60</td><td class="number">4.74%</td><td class="number">0.50%</td><td class="number">39.20</td><td class="number negative">-13.90%</td><td class="">5/28已配息</td></tr>
+<tr><td class="">3526</td><td class="">捷流閥業</td><td class="number">309</td><td class="number">4.00</td><td class="number">1.29%</td><td class="number">0.75%</td><td class="number">80.70</td><td class="number positive">282.90%</td><td class="">尚未公布</td></tr>
+<tr><td class="">6192</td><td class="">巨路</td><td class="number">120.5</td><td class="number">5.80</td><td class="number">4.81%</td><td class="number">0.50%</td><td class="number">107.50</td><td class="number positive">12.09%</td><td class="">4/23已配息</td></tr>
+<tr><td class="">4205</td><td class="">中華食</td><td class="number">73</td><td class="number">3.50</td><td class="number">4.79%</td><td class="number">0.50%</td><td class="number">81.30</td><td class="number negative">-10.21%</td><td class="">尚未公布</td></tr>
+<tr><td class="">2347</td><td class="">聯強</td><td class="number">87.2</td><td class="number">4.20</td><td class="number">4.82%</td><td class="number">1.00%</td><td class="number">57.90</td><td class="number positive">50.60%</td><td class="">尚未公布</td></tr>
+<tr><td class="">4107</td><td class="">邦特</td><td class="number">118</td><td class="number">5.50</td><td class="number">4.66%</td><td class="number">1.00%</td><td class="number">120.50</td><td class="number negative">-2.07%</td><td class="">尚未公布</td></tr>
+<tr><td class="">1726</td><td class="">永記</td><td class="number">79.5</td><td class="number">3.70</td><td class="number">4.65%</td><td class="number">0.50%</td><td class="number">76.50</td><td class="number positive">3.92%</td><td class="">7/21預計配息</td></tr>
+<tr><td class="">6263</td><td class="">普萊德</td><td class="number">157.5</td><td class="number">7.80</td><td class="number">4.95%</td><td class="number">0.75%</td><td class="number">130.50</td><td class="number positive">20.69%</td><td class="">6/5已配息</td></tr>
+<tr><td class="">6667</td><td class="">信紘科</td><td class="number">258.5</td><td class="number">11.71</td><td class="number">4.53%</td><td class="number">0.75%</td><td class="number">267.00</td><td class="number negative">-3.18%</td><td class="">6/23已配息</td></tr>
+<tr><td class="">8999</td><td class="">台灣積層</td><td class="number">-</td><td class="number">1.70</td><td class="number">-</td><td class="number">0.25%</td><td class="number">38.20</td><td class="number">-</td><td class="">7/24預計配息</td></tr>
+<tr><td class="">7705</td><td class="">華立</td><td class="number">31.05</td><td class="number">5.30</td><td class="number">17.07%</td><td class="number">1.75%</td><td class="number">107.50</td><td class="number negative">-71.12%</td><td class="">6/23已配息</td></tr>
+<tr><td class="">1227</td><td class="">佳格</td><td class="number">30.1</td><td class="number">1.34</td><td class="number">4.45%</td><td class="number">1.25%</td><td class="number">30.20</td><td class="number negative">-0.33%</td><td class="">尚未公布</td></tr>
+<tr><td class="">1229</td><td class="">聯華</td><td class="number">40.5</td><td class="number">1.80</td><td class="number">4.44%</td><td class="number">3.25%</td><td class="number">47.55</td><td class="number negative">-14.83%</td><td class="">7/8預計配息</td></tr>
+<tr><td class="">8422</td><td class="">可寧衛</td><td class="number">26.45</td><td class="number">1.20</td><td class="number">4.54%</td><td class="number">0.75%</td><td class="number">31.60</td><td class="number negative">-16.30%</td><td class="">6/29預計配息</td></tr>
+<tr><td class="">4506</td><td class="">崇友</td><td class="number">122.5</td><td class="number">5.30</td><td class="number">4.33%</td><td class="number">2.00%</td><td class="number">119.50</td><td class="number positive">2.51%</td><td class="">尚未公布</td></tr>
+<tr><td class="">6035</td><td class="">悠遊卡</td><td class="number">-</td><td class="number">2.28</td><td class="number">-</td><td class="number">0.50%</td><td class="number">59.40</td><td class="number">-</td><td class="">7/15預計配息</td></tr>
+<tr><td class="">3402</td><td class="">漢科</td><td class="number">158</td><td class="number">6.00</td><td class="number">3.80%</td><td class="number">0.50%</td><td class="number">134.50</td><td class="number positive">17.47%</td><td class="">7/22預計配息</td></tr>
+<tr><td class="">6214</td><td class="">精誠</td><td class="number">141</td><td class="number">6.00</td><td class="number">4.26%</td><td class="number">0.75%</td><td class="number">118.00</td><td class="number positive">19.49%</td><td class="">6/23已配息</td></tr>
+<tr><td class="">6183</td><td class="">關貿</td><td class="number">90.9</td><td class="number">3.55</td><td class="number">3.91%</td><td class="number">0.50%</td><td class="number">95.00</td><td class="number negative">-4.32%</td><td class="">尚未公布</td></tr>
+<tr><td class="">1216</td><td class="">統一</td><td class="number">78.6</td><td class="number">3.00</td><td class="number">3.82%</td><td class="number">6.50%</td><td class="number">77.10</td><td class="number positive">1.95%</td><td class="">尚未公布</td></tr>
+<tr><td class="">4164</td><td class="">承業醫</td><td class="number">27.7</td><td class="number">1.11</td><td class="number">4.01%</td><td class="number">0.25%</td><td class="number">38.50</td><td class="number negative">-28.05%</td><td class="">6/29預計配息</td></tr>
+<tr><td class="">2886</td><td class="">兆豐金</td><td class="number">46</td><td class="number">1.75</td><td class="number">3.80%</td><td class="number">1.00%</td><td class="number">40.00</td><td class="number positive">15.00%</td><td class="">尚未公布</td></tr>
+<tr><td class="">3036</td><td class="">文曄</td><td class="number">200</td><td class="number">7.80</td><td class="number">3.90%</td><td class="number">0.75%</td><td class="number">137.00</td><td class="number positive">45.99%</td><td class="">6/8已配息</td></tr>
+<tr><td class="">2891</td><td class="">中信金</td><td class="number">63.5</td><td class="number">2.50</td><td class="number">3.94%</td><td class="number">2.00%</td><td class="number">50.20</td><td class="number positive">26.49%</td><td class="">尚未公布</td></tr>
+<tr><td class="">3702</td><td class="">大聯大</td><td class="number">116.5</td><td class="number">3.80</td><td class="number">3.26%</td><td class="number">1.50%</td><td class="number">58.20</td><td class="number positive">100.17%</td><td class="">尚未公布</td></tr>
+<tr><td class="">1513</td><td class="">中興電</td><td class="number">171</td><td class="number">6.00</td><td class="number">3.51%</td><td class="number">1.00%</td><td class="number">149.50</td><td class="number positive">14.38%</td><td class="">7/9預計配息</td></tr>
+<tr><td class="">1623</td><td class="">大東電</td><td class="number">235</td><td class="number">8.00</td><td class="number">3.40%</td><td class="number">0.50%</td><td class="number">269.50</td><td class="number negative">-12.80%</td><td class="">3/24已配息</td></tr>
+<tr><td class="">6761</td><td class="">穩得</td><td class="number">171.5</td><td class="number">6.00</td><td class="number">3.50%</td><td class="number">0.25%</td><td class="number">137.00</td><td class="number positive">25.18%</td><td class="">3/26已配息</td></tr>
+<tr><td class="">1720</td><td class="">生達</td><td class="number">64.3</td><td class="number">2.00</td><td class="number">3.11%</td><td class="number">2.75%</td><td class="number">58.90</td><td class="number positive">9.17%</td><td class="">尚未公布</td></tr>
+<tr><td class="">3716</td><td class="">中化</td><td class="number">34.8</td><td class="number">1.00</td><td class="number">2.87%</td><td class="number">0.50%</td><td class="number">33.40</td><td class="number positive">4.19%</td><td class="">尚未公布</td></tr>
+<tr><td class="">4755</td><td class="">三福化</td><td class="number">137</td><td class="number">3.70</td><td class="number">2.70%</td><td class="number">0.50%</td><td class="number">107.50</td><td class="number positive">27.44%</td><td class="">7/1預計配息</td></tr>
+<tr><td class="">3023</td><td class="">信邦</td><td class="number">321.5</td><td class="number">9.10</td><td class="number">2.83%</td><td class="number">1.25%</td><td class="number">192.50</td><td class="number positive">67.01%</td><td class="">尚未公布</td></tr>
+<tr><td class="">8926</td><td class="">台汽電</td><td class="number">67.7</td><td class="number">2.12</td><td class="number">3.13%</td><td class="number">0.50%</td><td class="number">40.85</td><td class="number positive">65.73%</td><td class="">7/2預計配息</td></tr>
+<tr><td class="">2890</td><td class="">永豐金</td><td class="number">39.95</td><td class="number">1.10</td><td class="number">2.75%</td><td class="number">0.00%</td><td class="number">28.60</td><td class="number positive">39.69%</td><td class="">尚未公布</td></tr>
+<tr><td class="">5434</td><td class="">崇越</td><td class="number">556</td><td class="number">13.50</td><td class="number">2.43%</td><td class="number">3.00%</td><td class="number">291.00</td><td class="number positive">91.07%</td><td class="">尚未公布</td></tr>
+<tr><td class="">2885</td><td class="">元大金</td><td class="number">67</td><td class="number">1.80</td><td class="number">2.69%</td><td class="number">0.75%</td><td class="number">39.30</td><td class="number positive">70.48%</td><td class="">尚未公布</td></tr>
+<tr><td class="">4114</td><td class="">健喬</td><td class="number">33.6</td><td class="number">0.85</td><td class="number">2.53%</td><td class="number">0.50%</td><td class="number">32.40</td><td class="number positive">3.70%</td><td class="">尚未公布</td></tr>
+<tr><td class="">6411</td><td class="">晶焱</td><td class="number">88.7</td><td class="number">2.22</td><td class="number">2.50%</td><td class="number">0.50%</td><td class="number">76.00</td><td class="number positive">16.71%</td><td class="">尚未公布</td></tr>
+<tr><td class="">2645</td><td class="">長榮航太</td><td class="number">242</td><td class="number">5.00</td><td class="number">2.07%</td><td class="number">1.00%</td><td class="number">142.00</td><td class="number positive">70.42%</td><td class="">尚未公布</td></tr>
+<tr><td class="">8403</td><td class="">盛弘</td><td class="number">19.5</td><td class="number">0.40</td><td class="number">2.05%</td><td class="number">0.25%</td><td class="number">23.35</td><td class="number negative">-16.49%</td><td class="">尚未公布</td></tr>
+<tr><td class="">2812</td><td class="">台中銀</td><td class="number">20.3</td><td class="number">0.39</td><td class="number">1.92%</td><td class="number">0.50%</td><td class="number">20.80</td><td class="number negative">-2.40%</td><td class="">尚未公布</td></tr>
+<tr><td class="">3357</td><td class="">臺慶科</td><td class="number">250</td><td class="number">5.08</td><td class="number">2.03%</td><td class="number">0.50%</td><td class="number">146.50</td><td class="number positive">70.65%</td><td class="">6/29預計配息</td></tr>
+<tr><td class="">1231</td><td class="">聯華食</td><td class="number">88.2</td><td class="number">1.50</td><td class="number">1.70%</td><td class="number">4.75%</td><td class="number">97.60</td><td class="number negative">-9.63%</td><td class="">尚未公布</td></tr>
+<tr><td class="">5234</td><td class="">達興材</td><td class="number">376</td><td class="number">6.50</td><td class="number">1.73%</td><td class="number">0.50%</td><td class="number">347.00</td><td class="number positive">8.36%</td><td class="">3/20已配息</td></tr>
+<tr><td class="">3090</td><td class="">日電貿</td><td class="number">225</td><td class="number">4.80</td><td class="number">2.13%</td><td class="number">0.50%</td><td class="number">98.40</td><td class="number positive">128.66%</td><td class="">7/2預計配息</td></tr>
+<tr><td class="">4119</td><td class="">旭富</td><td class="number">46</td><td class="number">0.75</td><td class="number">1.63%</td><td class="number">0.25%</td><td class="number">48.70</td><td class="number negative">-5.54%</td><td class="">7/1預計配息</td></tr>
+<tr><td class="">3402</td><td class="">中美晶</td><td class="number">158</td><td class="number">2.50</td><td class="number">1.58%</td><td class="number">0.50%</td><td class="number">106.50</td><td class="number positive">48.36%</td><td class="">7/23預計配息</td></tr>
+<tr><td class="">5306</td><td class="">桂盟</td><td class="number">90.4</td><td class="number">0.83</td><td class="number">0.92%</td><td class="number">0.25%</td><td class="number">90.70</td><td class="number negative">-0.33%</td><td class="">6/29預計配息</td></tr>
+<tr><td class="">2330</td><td class="">台積電</td><td class="number">2,440</td><td class="number">23.00</td><td class="number">0.94%</td><td class="number">4.50%</td><td class="number">1550.00</td><td class="number positive">57.42%</td><td class="">6/11已配息</td></tr></tbody></table></div></main></body></html>

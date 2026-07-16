@@ -113,6 +113,9 @@ def quote_map(watchlists: dict[str, list[dict[str, str]]], prof_rows: list[list[
                 value = yahoo_chart_price(symbol)
                 if value is not None:
                     quotes[f"symbol:{symbol}"] = value
+                    code = entry.get("code", "")
+                    if code:
+                        quotes[code] = value
     return quotes
 
 
@@ -142,6 +145,59 @@ def render_quote_page(title: str, entries: list[dict[str, str]], quotes: dict[st
     return page_shell(title, timestamp, len(entries), missing, body)
 
 
+def sortable_table_script() -> str:
+    return """<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const table = document.querySelector("table");
+  if (!table || !table.tHead || !table.tBodies.length) return;
+
+  const style = document.createElement("style");
+  style.textContent = "th.sortable{cursor:pointer;user-select:none}th.sortable:hover,th.sortable:focus{background:#17633f;outline:2px solid #0f5132;outline-offset:-2px}th.sortable[data-sort='asc']::after{content:' ▲'}th.sortable[data-sort='desc']::after{content:' ▼'}";
+  document.head.appendChild(style);
+
+  const headers = Array.from(table.tHead.rows[0].cells);
+  let sortedColumn = -1;
+  let ascending = true;
+  const compareValues = (left, right) => {
+    const leftNumber = Number.parseFloat(left.replace(/[% ,]/g, ""));
+    const rightNumber = Number.parseFloat(right.replace(/[% ,]/g, ""));
+    if (!Number.isNaN(leftNumber) && !Number.isNaN(rightNumber)) return leftNumber - rightNumber;
+    if (!Number.isNaN(leftNumber)) return -1;
+    if (!Number.isNaN(rightNumber)) return 1;
+    return left.localeCompare(right, "zh-Hant", { numeric: true });
+  };
+  const sortBy = (index) => {
+    ascending = sortedColumn === index ? !ascending : true;
+    sortedColumn = index;
+    const rows = Array.from(table.tBodies[0].rows);
+    rows.sort((a, b) => {
+      const result = compareValues(a.cells[index].innerText.trim(), b.cells[index].innerText.trim());
+      return ascending ? result : -result;
+    });
+    rows.forEach((row) => table.tBodies[0].appendChild(row));
+    headers.forEach((header, headerIndex) => {
+      const active = headerIndex === index;
+      header.dataset.sort = active ? (ascending ? "asc" : "desc") : "";
+      header.setAttribute("aria-sort", active ? (ascending ? "ascending" : "descending") : "none");
+    });
+  };
+  headers.forEach((header, index) => {
+    header.classList.add("sortable");
+    header.tabIndex = 0;
+    header.setAttribute("role", "button");
+    header.setAttribute("aria-sort", "none");
+    header.addEventListener("click", () => sortBy(index));
+    header.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        sortBy(index);
+      }
+    });
+  });
+});
+</script>"""
+
+
 def render_prof_page(rows: list[list[str]], quotes: dict[str, float], timestamp: str) -> str:
     rendered: list[str] = []
     for row in rows:
@@ -166,7 +222,7 @@ def render_prof_page(rows: list[list[str]], quotes: dict[str, float], timestamp:
             cells.append(f"<td class=\"{cls}\">{html.escape(value)}</td>")
         rendered.append("<tr>" + "".join(cells) + "</tr>")
     header = "<thead><tr><th>股號</th><th>股票名稱</th><th>現價</th><th>預估股利</th><th>預估殖利率</th><th>應持有比例</th><th>12月31日股價</th><th>今年績效</th><th>除權息</th></tr></thead>"
-    body = header + "<tbody>" + "\n".join(rendered) + "</tbody>"
+    body = header + sortable_table_script() + "<tbody>" + "\n".join(rendered) + "</tbody>"
     return page_shell("殖利率資料", timestamp, len(rendered), sum("-" in item for item in rendered), body)
 
 

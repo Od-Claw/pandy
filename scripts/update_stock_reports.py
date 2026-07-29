@@ -310,12 +310,17 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
   });
+  // The dividend-yield report opens with estimated yield sorted high to low.
+  // Calling twice applies ascending first, then descending, while keeping
+  // subsequent clicks as a natural direction toggle.
+  sortBy(4);
+  sortBy(4);
 });
 </script>"""
 
 
 def render_prof_page(rows: list[list[str]], quotes: dict[str, float], timestamp: str) -> str:
-    rendered: list[str] = []
+    rendered_rows: list[tuple[float, str]] = []
     missing = 0
     for row in rows:
         if len(row) < 9:
@@ -339,7 +344,10 @@ def render_prof_page(rows: list[list[str]], quotes: dict[str, float], timestamp:
             if index == 7 and performance is not None:
                 cls = f"number {performance_class}"
             cells.append(f"<td class=\"{cls}\">{html.escape(value)}</td>")
-        rendered.append("<tr>" + "".join(cells) + "</tr>")
+        sort_yield = yield_value if yield_value is not None else float("-inf")
+        rendered_rows.append((sort_yield, "<tr>" + "".join(cells) + "</tr>"))
+    rendered_rows.sort(key=lambda item: item[0], reverse=True)
+    rendered = [row_html for _yield_value, row_html in rendered_rows]
     header = "<thead><tr><th>股號</th><th>股票名稱</th><th>現價</th><th>預估股利</th><th>預估殖利率</th><th>應持有比例</th><th>12月31日股價</th><th>今年績效</th><th>除權息</th></tr></thead>"
     body = header + sortable_table_script() + "<tbody>" + "\n".join(rendered) + "</tbody>"
     return page_shell("殖利率資料", timestamp, len(rendered), missing, body)

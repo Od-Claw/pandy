@@ -10,14 +10,19 @@ import json
 import re
 import time
 import urllib.parse
+import warnings
 from pathlib import Path
+from typing import Any
 
 import requests
+from urllib3.exceptions import InsecureRequestWarning
 
 
 ROOT = Path(__file__).resolve().parents[1]
 TAIPEI = dt.timezone(dt.timedelta(hours=8))
 TWSE_URL = "https://mis.twse.com.tw/stock/api/getStockInfo.jsp"
+TPEX_ESB_URL = "https://www.tpex.org.tw/openapi/v1/tpex_esb_latest_statistics"
+EXPECTED_COUNTS = {"pandy": 137, "stock": 111, "prof": 95}
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (compatible; OdClawStockUpdater/1.0)",
     "Referer": "https://mis.twse.com.tw/stock/fibest.jsp?lang=zh_tw",
@@ -50,8 +55,16 @@ def price_text(value: float | None) -> str:
     return f"{value:,.2f}".rstrip("0").rstrip(".")
 
 
-def request_json(url: str, params: dict[str, str]) -> dict:
-    response = requests.get(url, params=params, headers=HEADERS, timeout=25)
+def request_json(url: str, params: dict[str, str] | None = None) -> Any:
+    try:
+        response = requests.get(url, params=params, headers=HEADERS, timeout=25)
+    except requests.exceptions.SSLError:
+        # Some Windows/Python certificate stores reject TPEx's otherwise valid
+        # certificate chain. Retry only this SSL failure so weekday automation
+        # can still consume the official TPEx OpenAPI.
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", InsecureRequestWarning)
+            response = requests.get(url, params=params, headers=HEADERS, timeout=25, verify=False)
     response.raise_for_status()
     return response.json()
 
@@ -81,6 +94,29 @@ def twse_quotes(codes: set[str]) -> dict[str, float]:
     return quotes
 
 
+def tpex_esb_quotes(codes: set[str]) -> dict[str, float]:
+    """Fetch emerging-stock prices from the official TPEx OpenAPI."""
+    quotes: dict[str, float] = {}
+    try:
+        payload = request_json(TPEX_ESB_URL)
+    except Exception:
+        return quotes
+    if not isinstance(payload, list):
+        return quotes
+    for item in payload:
+        if not isinstance(item, dict):
+            continue
+        code = str(item.get("SecuritiesCompanyCode") or "").strip()
+        if code not in codes:
+            continue
+        for field in ("LatestPrice", "Average", "PreviousAveragePrice"):
+            quote = as_float(str(item.get(field) or ""))
+            if quote is not None:
+                quotes[code] = quote
+                break
+    return quotes
+
+
 def yahoo_chart_price(symbol: str) -> float | None:
     url = f"https://query1.finance.yahoo.com/v8/finance/chart/{urllib.parse.quote(symbol, safe='^')}"
     try:
@@ -102,10 +138,46 @@ def load_watchlists(path: Path) -> dict[str, list[dict[str, str]]]:
     return data
 
 
+def reconcile_prof_codes(
+    prof_rows: list[list[str]], watchlists: dict[str, list[dict[str, str]]]
+) -> tuple[list[list[str]], list[dict[str, str]]]:
+    """Use the maintained watchlists as the canonical name-to-code mapping."""
+    name_to_code: dict[str, str] = {}
+    for group in watchlists.values():
+        for entry in group:
+            name = entry.get("name", "").strip()
+            code = entry.get("code", "").strip()
+            if not name or not code:
+                continue
+            existing = name_to_code.get(name)
+            if existing and existing != code:
+                raise ValueError(f"watchlist code conflict: {name}={existing}/{code}")
+            name_to_code[name] = code
+
+    corrected: list[list[str]] = []
+    corrections: list[dict[str, str]] = []
+    for source_row in prof_rows:
+        row = list(source_row)
+        if len(row) >= 2:
+            expected = name_to_code.get(row[1])
+            if expected and row[0] != expected:
+                corrections.append({"name": row[1], "from": row[0], "to": expected})
+                row[0] = expected
+        corrected.append(row)
+    return corrected, corrections
+
+
 def quote_map(watchlists: dict[str, list[dict[str, str]]], prof_rows: list[list[str]]) -> dict[str, float]:
-    codes = {entry.get("code", "") for group in watchlists.values() for entry in group}
+    codes = {
+        entry.get("code", "")
+        for group in watchlists.values()
+        for entry in group
+        if not entry.get("status")
+    }
     codes.update(row[0] for row in prof_rows if row)
     quotes = twse_quotes(codes)
+    for code, value in tpex_esb_quotes(codes).items():
+        quotes.setdefault(code, value)
     for group in watchlists.values():
         for entry in group:
             symbol = entry.get("symbol")
@@ -119,23 +191,67 @@ def quote_map(watchlists: dict[str, list[dict[str, str]]], prof_rows: list[list[
     return quotes
 
 
+def entry_quote(entry: dict[str, str], quotes: dict[str, float]) -> float | None:
+    if entry.get("symbol"):
+        return quotes.get(f"symbol:{entry['symbol']}")
+    return quotes.get(entry.get("code", ""))
+
+
+def validate_inputs_and_quotes(
+    watchlists: dict[str, list[dict[str, str]]],
+    prof_rows: list[list[str]],
+    quotes: dict[str, float],
+) -> None:
+    errors: list[str] = []
+    for key in ("pandy", "stock"):
+        actual = len(watchlists[key])
+        if actual != EXPECTED_COUNTS[key]:
+            errors.append(f"{key} rows: expected {EXPECTED_COUNTS[key]}, got {actual}")
+        missing = [
+            entry["name"]
+            for entry in watchlists[key]
+            if not entry.get("status") and entry_quote(entry, quotes) is None
+        ]
+        if missing:
+            errors.append(f"{key} missing prices: {', '.join(missing)}")
+
+    valid_prof_rows = [row for row in prof_rows if len(row) >= 9]
+    if len(valid_prof_rows) != EXPECTED_COUNTS["prof"]:
+        errors.append(f"prof rows: expected {EXPECTED_COUNTS['prof']}, got {len(valid_prof_rows)}")
+    code_names: dict[str, list[str]] = {}
+    for row in valid_prof_rows:
+        code_names.setdefault(row[0], []).append(row[1])
+    duplicates = {
+        code: names for code, names in code_names.items() if len(set(names)) > 1
+    }
+    if duplicates:
+        detail = "; ".join(f"{code}={','.join(names)}" for code, names in duplicates.items())
+        errors.append(f"prof duplicate codes: {detail}")
+    missing_prof = [row[1] for row in valid_prof_rows if quotes.get(row[0]) is None]
+    if missing_prof:
+        errors.append(f"prof missing prices: {', '.join(missing_prof)}")
+    if errors:
+        raise RuntimeError("validation failed: " + " | ".join(errors))
+
+
 def page_shell(title: str, timestamp: str, count: int, unavailable: int, body: str) -> str:
     return f"""<!DOCTYPE html>
 <html lang=\"zh-TW\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">
 <title>{html.escape(title)}</title><style>
 :root{{--bg:#f5f7fa;--panel:#fff;--text:#1f2937;--muted:#64748b;--border:#d7dee8;--accent:#1f7a4f;--soft:#e9f6ef;--danger:#c2410c}}*{{box-sizing:border-box}}body{{margin:0;background:var(--bg);color:var(--text);font-family:Arial,\"Microsoft JhengHei\",sans-serif}}main{{width:min(1120px,calc(100% - 32px));margin:28px auto}}header{{display:flex;align-items:end;justify-content:space-between;gap:16px;margin-bottom:16px}}h1{{margin:0 0 6px;font-size:clamp(24px,3vw,34px)}}.meta{{color:var(--muted);font-size:14px}}.summary{{display:flex;gap:8px;flex-wrap:wrap}}.badge{{border:1px solid var(--border);border-radius:6px;background:var(--panel);padding:7px 10px;font-size:14px}}.wrap{{overflow-x:auto;border-radius:8px;box-shadow:0 8px 24px rgba(15,23,42,.08)}}table{{width:100%;border-collapse:collapse;background:var(--panel)}}th,td{{padding:10px 12px;border-bottom:1px solid var(--border);text-align:left;white-space:nowrap}}th{{position:sticky;top:0;background:var(--accent);color:#fff}}tbody tr:nth-child(even){{background:#fbfcfd}}tbody tr:hover{{background:var(--soft)}}.price,.number{{text-align:right;font-variant-numeric:tabular-nums}}.price{{font-weight:700}}.no-price{{color:var(--danger);font-weight:700}}.positive{{color:#b91c1c;font-weight:700}}.negative{{color:#047857;font-weight:700}}@media(max-width:720px){{header{{display:block}}.summary{{margin-top:10px}}th,td{{padding:9px 10px}}}}
-</style></head><body><main><header><div><h1>{html.escape(title)}</h1><div class=\"meta\">更新時間：{timestamp} ｜ 資料來源：TWSE MIS（Yahoo 指數備援）</div></div><div class=\"summary\"><div class=\"badge\">筆數：{count}</div><div class=\"badge\">未取得：{unavailable}</div></div></header><div class=\"wrap\"><table>{body}</table></div></main></body></html>\n"""
+</style></head><body><main><header><div><h1>{html.escape(title)}</h1><div class=\"meta\">更新時間：{timestamp} ｜ 資料來源：TWSE MIS、TPEx OpenAPI（Yahoo 指數備援）</div></div><div class=\"summary\"><div class=\"badge\">筆數：{count}</div><div class=\"badge\">未取得：{unavailable}</div></div></header><div class=\"wrap\"><table>{body}</table></div></main></body></html>\n"""
 
 
 def render_quote_page(title: str, entries: list[dict[str, str]], quotes: dict[str, float], timestamp: str) -> str:
     rows: list[str] = []
     missing = 0
     for entry in entries:
-        value = quotes.get(entry.get("code", ""))
-        if entry.get("symbol"):
-            value = quotes.get(f"symbol:{entry['symbol']}")
+        value = entry_quote(entry, quotes)
         name = html.escape(entry["name"])
-        if value is None:
+        status = entry.get("status")
+        if status:
+            price = f'<span class="no-price">{html.escape(status)}</span>'
+        elif value is None:
             missing += 1
             price = '<span class="no-price">-</span>'
         else:
@@ -200,11 +316,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
 def render_prof_page(rows: list[list[str]], quotes: dict[str, float], timestamp: str) -> str:
     rendered: list[str] = []
+    missing = 0
     for row in rows:
         if len(row) < 9:
             continue
         code, name, _old_price, dividend, _yield, holding, dec_price, _performance, ex_rights = row[:9]
         price = quotes.get(code)
+        if price is None:
+            missing += 1
         dividend_number = as_float(dividend)
         dec_number = as_float(dec_price)
         yield_value = dividend_number / price * 100 if dividend_number is not None and price else None
@@ -223,7 +342,7 @@ def render_prof_page(rows: list[list[str]], quotes: dict[str, float], timestamp:
         rendered.append("<tr>" + "".join(cells) + "</tr>")
     header = "<thead><tr><th>股號</th><th>股票名稱</th><th>現價</th><th>預估股利</th><th>預估殖利率</th><th>應持有比例</th><th>12月31日股價</th><th>今年績效</th><th>除權息</th></tr></thead>"
     body = header + sortable_table_script() + "<tbody>" + "\n".join(rendered) + "</tbody>"
-    return page_shell("殖利率資料", timestamp, len(rendered), sum("-" in item for item in rendered), body)
+    return page_shell("殖利率資料", timestamp, len(rendered), missing, body)
 
 
 def main() -> int:
@@ -237,7 +356,9 @@ def main() -> int:
     prof_path = root / "prof_data.html"
     prof_rows = table_rows(prof_path.read_text(encoding="utf-8"))
     watchlists = load_watchlists(watchlists_path)
+    prof_rows, corrections = reconcile_prof_codes(prof_rows, watchlists)
     quotes = quote_map(watchlists, prof_rows)
+    validate_inputs_and_quotes(watchlists, prof_rows, quotes)
     timestamp = dt.datetime.now(TAIPEI).strftime("%Y-%m-%d %H:%M:%S")
     pages = {
         "pandy_data.html": render_quote_page("Pandorabox 股票股價更新", watchlists["pandy"], quotes, timestamp),
@@ -247,7 +368,13 @@ def main() -> int:
     if not args.dry_run:
         for filename, content in pages.items():
             (root / filename).write_text(content, encoding="utf-8", newline="\n")
-    print(json.dumps({"updated_at": timestamp, "quotes": len(quotes), "files": list(pages), "dry_run": args.dry_run}, ensure_ascii=False))
+    print(json.dumps({
+        "updated_at": timestamp,
+        "quotes": len(quotes),
+        "files": list(pages),
+        "prof_code_corrections": corrections,
+        "dry_run": args.dry_run,
+    }, ensure_ascii=False))
     return 0
 
 

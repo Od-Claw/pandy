@@ -22,7 +22,7 @@ ROOT = Path(__file__).resolve().parents[1]
 TAIPEI = dt.timezone(dt.timedelta(hours=8))
 TWSE_URL = "https://mis.twse.com.tw/stock/api/getStockInfo.jsp"
 TPEX_ESB_URL = "https://www.tpex.org.tw/openapi/v1/tpex_esb_latest_statistics"
-EXPECTED_COUNTS = {"pandy": 138, "stock": 111, "prof": 95}
+EXPECTED_COUNTS = {"pandy": 139, "stock": 111, "prof": 95}
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (compatible; OdClawStockUpdater/1.0)",
     "Referer": "https://mis.twse.com.tw/stock/fibest.jsp?lang=zh_tw",

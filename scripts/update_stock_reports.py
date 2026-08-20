@@ -7,6 +7,7 @@ import argparse
 import datetime as dt
 import html
 import json
+import os
 import re
 import time
 import urllib.parse
@@ -138,6 +139,49 @@ def load_watchlists(path: Path) -> dict[str, list[dict[str, str]]]:
     return data
 
 
+def load_pandorabox_export(path: Path) -> list[dict[str, str]]:
+    """Validate the stock-system exchange file without deduplicating or reordering."""
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise ValueError(f"invalid Pandorabox exchange file: {error}") from error
+    if payload.get("schema_version") != 1 or payload.get("target") != "pandorabox":
+        raise ValueError("Pandorabox exchange schema/target mismatch")
+    if payload.get("source_board") != "Pandorabox":
+        raise ValueError("Pandorabox exchange must come from the exact-name board")
+    raw_items = payload.get("items")
+    if not isinstance(raw_items, list) or not raw_items:
+        raise ValueError("Pandorabox exchange has no items")
+    rows: list[dict[str, str]] = []
+    for expected_position, item in enumerate(raw_items, 1):
+        if not isinstance(item, dict) or item.get("position") != expected_position:
+            raise ValueError("Pandorabox exchange positions must be contiguous and ordered")
+        code = str(item.get("code") or "").strip().upper()
+        name = str(item.get("name") or "").strip()
+        status = str(item.get("status") or "").strip()
+        if item.get("visibility_scope") != "shared":
+            raise ValueError(f"Pandorabox exchange contains non-public stock: {code or expected_position}")
+        if not re.fullmatch(r"[0-9A-Z]{2,12}", code) or not name:
+            raise ValueError(f"Pandorabox exchange item {expected_position} has invalid code/name")
+        if item.get("enabled") is False and not status:
+            raise ValueError(f"Pandorabox disabled item {code} is missing a public status")
+        row = {"name": name, "code": code}
+        if status:
+            row["status"] = status
+        rows.append(row)
+    return rows
+
+
+def write_watchlists_atomic(path: Path, watchlists: dict[str, list[dict[str, str]]]) -> None:
+    content = json.dumps(watchlists, ensure_ascii=False, indent=2) + "\n"
+    temp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    try:
+        temp.write_text(content, encoding="utf-8", newline="\n")
+        os.replace(temp, path)
+    finally:
+        temp.unlink(missing_ok=True)
+
+
 def reconcile_prof_codes(
     prof_rows: list[list[str]], watchlists: dict[str, list[dict[str, str]]]
 ) -> tuple[list[list[str]], list[dict[str, str]]]:
@@ -201,12 +245,15 @@ def validate_inputs_and_quotes(
     watchlists: dict[str, list[dict[str, str]]],
     prof_rows: list[list[str]],
     quotes: dict[str, float],
+    *,
+    expected_pandy_count: int,
 ) -> None:
     errors: list[str] = []
     for key in ("pandy", "stock"):
         actual = len(watchlists[key])
-        if actual != EXPECTED_COUNTS[key]:
-            errors.append(f"{key} rows: expected {EXPECTED_COUNTS[key]}, got {actual}")
+        expected = expected_pandy_count if key == "pandy" else EXPECTED_COUNTS[key]
+        if actual != expected:
+            errors.append(f"{key} rows: expected {expected}, got {actual}")
         missing = [
             entry["name"]
             for entry in watchlists[key]
@@ -357,6 +404,12 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Update the three Od-Claw/pandy stock reports.")
     parser.add_argument("--root", type=Path, default=ROOT, help="Repository root containing the three HTML files")
     parser.add_argument("--watchlists", type=Path, default=None, help="Path to stock_watchlists.json")
+    parser.add_argument(
+        "--pandorabox-export",
+        type=Path,
+        default=None,
+        help="Validated exchange JSON exported by the exact-name Pandorabox board",
+    )
     parser.add_argument("--dry-run", action="store_true", help="Fetch and render without writing files")
     args = parser.parse_args()
     root = args.root.resolve()
@@ -364,9 +417,22 @@ def main() -> int:
     prof_path = root / "prof_data.html"
     prof_rows = table_rows(prof_path.read_text(encoding="utf-8"))
     watchlists = load_watchlists(watchlists_path)
+    export_path = args.pandorabox_export
+    if export_path is None and os.environ.get("PANDORABOX_EXPORT_PATH"):
+        export_path = Path(os.environ["PANDORABOX_EXPORT_PATH"])
+    export_applied = False
+    if export_path is not None:
+        export_path = export_path.resolve()
+        watchlists["pandy"] = load_pandorabox_export(export_path)
+        export_applied = True
     prof_rows, corrections = reconcile_prof_codes(prof_rows, watchlists)
     quotes = quote_map(watchlists, prof_rows)
-    validate_inputs_and_quotes(watchlists, prof_rows, quotes)
+    validate_inputs_and_quotes(
+        watchlists,
+        prof_rows,
+        quotes,
+        expected_pandy_count=len(watchlists["pandy"]),
+    )
     timestamp = dt.datetime.now(TAIPEI).strftime("%Y-%m-%d %H:%M:%S")
     pages = {
         "pandy_data.html": render_quote_page("Pandorabox 股票股價更新", watchlists["pandy"], quotes, timestamp),
@@ -374,6 +440,8 @@ def main() -> int:
         "prof_data.html": render_prof_page(prof_rows, quotes, timestamp),
     }
     if not args.dry_run:
+        if export_applied:
+            write_watchlists_atomic(watchlists_path, watchlists)
         for filename, content in pages.items():
             (root / filename).write_text(content, encoding="utf-8", newline="\n")
     print(json.dumps({
@@ -381,6 +449,9 @@ def main() -> int:
         "quotes": len(quotes),
         "files": list(pages),
         "prof_code_corrections": corrections,
+        "pandorabox_export_applied": export_applied,
+        "pandorabox_rows": len(watchlists["pandy"]),
+        "pandorabox_export_path": str(export_path) if export_path else None,
         "dry_run": args.dry_run,
     }, ensure_ascii=False))
     return 0

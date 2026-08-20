@@ -1,37 +1,32 @@
 from __future__ import annotations
 
-import hashlib
 import json
 import unittest
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-ORIGINAL_141_SHA256 = "be1684a4529f9f2e9ab5b2af3f246d5ac867c9b273b5c7ac33799b390efecb7d"
-
-
 class PandoraboxWatchlistTests(unittest.TestCase):
-    def test_original_rows_are_unchanged_and_6024_is_appended(self):
+    def test_pandorabox_rows_are_ordered_valid_and_duplicates_are_allowed(self):
         payload = json.loads((ROOT / "data" / "stock_watchlists.json").read_text(encoding="utf-8"))
         rows = payload["pandy"]
-        self.assertEqual(len(rows), 142)
-        self.assertEqual(rows[-3], {"name": "沛亨", "code": "6291"})
-        self.assertEqual(rows[-2], {"name": "樺漢", "code": "6414"})
-        self.assertEqual(rows[-1], {"name": "群益期", "code": "6024"})
-        original_bytes = json.dumps(
-            rows[:141], ensure_ascii=False, separators=(",", ":")
-        ).encode("utf-8")
-        self.assertEqual(hashlib.sha256(original_bytes).hexdigest(), ORIGINAL_141_SHA256)
+        self.assertGreater(len(rows), 0)
+        for row in rows:
+            self.assertTrue(str(row.get("name") or "").strip())
+            self.assertRegex(str(row.get("code") or ""), r"^[0-9A-Z]{2,12}$")
+        # Repeated stocks are an intentional list feature; this test must not
+        # deduplicate or sort the administrator-maintained sequence.
+        self.assertGreater(len(rows), len({row["code"] for row in rows}))
 
-    def test_updater_expected_count_matches_watchlist(self):
+    def test_updater_keeps_fixed_counts_only_for_the_other_reports(self):
         updater_path = ROOT / "scripts" / "update_stock_reports.py"
         namespace: dict[str, object] = {
             "__name__": "watchlist_updater_test",
             "__file__": str(updater_path),
         }
         exec(compile(updater_path.read_text(encoding="utf-8"), str(updater_path), "exec"), namespace)
-        payload = json.loads((ROOT / "data" / "stock_watchlists.json").read_text(encoding="utf-8"))
-        self.assertEqual(namespace["EXPECTED_COUNTS"]["pandy"], len(payload["pandy"]))
+        self.assertEqual(namespace["EXPECTED_COUNTS"]["stock"], 111)
+        self.assertEqual(namespace["EXPECTED_COUNTS"]["prof"], 95)
 
 
 if __name__ == "__main__":

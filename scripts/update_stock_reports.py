@@ -6,9 +6,12 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import html
+import hashlib
 import json
+import math
 import os
 import re
+import sys
 import time
 import urllib.parse
 import warnings
@@ -45,7 +48,8 @@ def table_rows(page: str) -> list[list[str]]:
 
 def as_float(value: str) -> float | None:
     try:
-        return float(value.replace(",", "").replace("%", "").strip())
+        number = float(value.replace(",", "").replace("%", "").strip())
+        return number if math.isfinite(number) else None
     except (AttributeError, ValueError):
         return None
 
@@ -57,41 +61,67 @@ def price_text(value: float | None) -> str:
 
 
 def request_json(url: str, params: dict[str, str] | None = None) -> Any:
-    try:
-        response = requests.get(url, params=params, headers=HEADERS, timeout=25)
-    except requests.exceptions.SSLError:
-        # Some Windows/Python certificate stores reject TPEx's otherwise valid
-        # certificate chain. Retry only this SSL failure so weekday automation
-        # can still consume the official TPEx OpenAPI.
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", InsecureRequestWarning)
-            response = requests.get(url, params=params, headers=HEADERS, timeout=25, verify=False)
-    response.raise_for_status()
-    return response.json()
+    for attempt in range(3):
+        try:
+            try:
+                response = requests.get(url, params=params, headers=HEADERS, timeout=20)
+            except requests.exceptions.SSLError:
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore", InsecureRequestWarning)
+                    response = requests.get(url, params=params, headers=HEADERS, timeout=20, verify=False)
+            response.raise_for_status()
+            return response.json()
+        except (requests.exceptions.RequestException, ValueError) as error:
+            # Client-side input/permission errors do not improve with retries.
+            status = getattr(getattr(error, "response", None), "status_code", None)
+            if attempt == 2 or (status is not None and 400 <= status < 500 and status not in (408, 429)):
+                raise
+            print(f"Source retry {attempt + 1}/3: {type(error).__name__}", file=sys.stderr)
+            time.sleep(2 ** attempt)
 
 
 def twse_quotes(codes: set[str]) -> dict[str, float]:
-    """Fetch listed/OTC prices in batches and use the previous close off-market."""
+    """Recover only missing codes, using smaller batches after partial failures."""
     quotes: dict[str, float] = {}
-    ordered = sorted(code for code in codes if code)
-    for market in ("tse", "otc"):
-        for start in range(0, len(ordered), 40):
-            batch = ordered[start : start + 40]
-            channels = "|".join(f"{market}_{code}.tw" for code in batch)
-            try:
-                payload = request_json(TWSE_URL, {"ex_ch": channels, "json": "1", "delay": "0"})
-            except Exception:
-                continue
-            for item in payload.get("msgArray", []):
-                code = str(item.get("c") or "").strip()
-                if not code or code in quotes:
+    requested = {code for code in codes if code}
+    for round_index, batch_size in enumerate((40, 10, 5)):
+        if round_index and requested - quotes.keys():
+            print(f"Recover missing MIS codes: {len(requested - quotes.keys())}", file=sys.stderr)
+            time.sleep(2 ** round_index)
+        for market in ("tse", "otc"):
+            ordered = sorted(requested - quotes.keys())
+            for start in range(0, len(ordered), batch_size):
+                batch = ordered[start : start + batch_size]
+                channels = "|".join(f"{market}_{code}.tw" for code in batch)
+                try:
+                    payload = request_json(TWSE_URL, {"ex_ch": channels, "json": "1", "delay": "0"})
+                    items = payload.get("msgArray", [])
+                    if not isinstance(items, list):
+                        raise ValueError("MIS msgArray is not a list")
+                except Exception as error:
+                    print(f"MIS batch unavailable: {market}, {len(batch)} codes, {type(error).__name__}", file=sys.stderr)
                     continue
-                quote = as_float(str(item.get("z") or ""))
-                if quote is None:
-                    quote = as_float(str(item.get("y") or ""))
-                if quote is not None:
-                    quotes[code] = quote
-            time.sleep(0.25)
+                for item in items:
+                    if not isinstance(item, dict):
+                        continue
+                    code = str(item.get("c") or "").strip()
+                    if code not in requested or code in quotes or item.get("ex", market) != market:
+                        continue
+                    trade = item.get("trade") if isinstance(item.get("trade"), dict) else {}
+                    # A trade nested in the MIS response is a real last price.
+                    # Yesterday's reference must never override it.
+                    quote = as_float(str(item.get("z") or ""))
+                    if quote is None or quote <= 0:
+                        quote = as_float(str(trade.get("z") or ""))
+                    # For a security with no trade, keep the official reference
+                    # price rather than constructing a price from bid/ask.
+                    if quote is None or quote <= 0:
+                        quote = as_float(str(item.get("y") or ""))
+                    if quote is not None and quote > 0:
+                        quotes[code] = quote
+                time.sleep(0.25)
+        if requested <= quotes.keys():
+            break
     return quotes
 
 
@@ -241,6 +271,43 @@ def entry_quote(entry: dict[str, str], quotes: dict[str, float]) -> float | None
     return quotes.get(entry.get("code", ""))
 
 
+def quote_snapshot_fingerprint(watchlists: dict, prof_rows: list) -> str:
+    content = json.dumps({"watchlists": watchlists, "prof_rows": prof_rows},
+                         ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(content.encode("utf-8")).hexdigest()
+
+
+def save_quote_snapshot(path: Path, watchlists: dict, prof_rows: list, quotes: dict) -> None:
+    payload = {"schema_version": 1, "created_at": dt.datetime.now(TAIPEI).isoformat(),
+               "fingerprint": quote_snapshot_fingerprint(watchlists, prof_rows), "quotes": quotes}
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    try:
+        temp.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+        os.replace(temp, path)
+    finally:
+        temp.unlink(missing_ok=True)
+
+
+def load_quote_snapshot(path: Path, watchlists: dict, prof_rows: list) -> dict[str, float]:
+    data = json.loads(path.read_text(encoding="utf-8"))
+    created = dt.datetime.fromisoformat(data["created_at"])
+    if created.tzinfo is None:
+        raise ValueError("quote snapshot timestamp must include timezone")
+    age = (dt.datetime.now(TAIPEI) - created).total_seconds()
+    if data.get("schema_version") != 1 or not 0 <= age <= 600:
+        raise ValueError("quote snapshot is expired or invalid")
+    if data.get("fingerprint") != quote_snapshot_fingerprint(watchlists, prof_rows):
+        raise ValueError("quote snapshot watchlist/source mismatch")
+    quotes = data.get("quotes")
+    if not isinstance(quotes, dict) or any(
+        not isinstance(value, (float, int)) or isinstance(value, bool)
+        or not math.isfinite(value) or value <= 0 for value in quotes.values()
+    ):
+        raise ValueError("quote snapshot contains invalid prices")
+    return quotes
+
+
 def validate_inputs_and_quotes(
     watchlists: dict[str, list[dict[str, str]]],
     prof_rows: list[list[str]],
@@ -249,6 +316,9 @@ def validate_inputs_and_quotes(
     expected_pandy_count: int,
 ) -> None:
     errors: list[str] = []
+    if any(not isinstance(value, (int, float)) or isinstance(value, bool)
+           or not math.isfinite(value) or value <= 0 for value in quotes.values()):
+        errors.append("invalid/non-positive quote values")
     for key in ("pandy", "stock"):
         actual = len(watchlists[key])
         expected = expected_pandy_count if key == "pandy" else EXPECTED_COUNTS[key]
@@ -257,7 +327,7 @@ def validate_inputs_and_quotes(
         missing = [
             entry["name"]
             for entry in watchlists[key]
-            if not entry.get("status") and entry_quote(entry, quotes) is None
+            if not entry.get("status") and (entry_quote(entry, quotes) is None or entry_quote(entry, quotes) <= 0)
         ]
         if missing:
             errors.append(f"{key} missing prices: {', '.join(missing)}")
@@ -411,6 +481,7 @@ def main() -> int:
         help="Validated exchange JSON exported by the exact-name Pandorabox board",
     )
     parser.add_argument("--dry-run", action="store_true", help="Fetch and render without writing files")
+    parser.add_argument("--quote-snapshot", type=Path, help="Dry-run saves validated quotes; generation reuses that exact snapshot for up to ten minutes")
     args = parser.parse_args()
     root = args.root.resolve()
     watchlists_path = args.watchlists or root / "data" / "stock_watchlists.json"
@@ -426,13 +497,17 @@ def main() -> int:
         watchlists["pandy"] = load_pandorabox_export(export_path)
         export_applied = True
     prof_rows, corrections = reconcile_prof_codes(prof_rows, watchlists)
-    quotes = quote_map(watchlists, prof_rows)
+    quotes = (load_quote_snapshot(args.quote_snapshot, watchlists, prof_rows)
+              if args.quote_snapshot and not args.dry_run
+              else quote_map(watchlists, prof_rows))
     validate_inputs_and_quotes(
         watchlists,
         prof_rows,
         quotes,
         expected_pandy_count=len(watchlists["pandy"]),
     )
+    if args.quote_snapshot and args.dry_run:
+        save_quote_snapshot(args.quote_snapshot, watchlists, prof_rows, quotes)
     timestamp = dt.datetime.now(TAIPEI).strftime("%Y-%m-%d %H:%M:%S")
     pages = {
         "pandy_data.html": render_quote_page("Pandorabox 股票股價更新", watchlists["pandy"], quotes, timestamp),

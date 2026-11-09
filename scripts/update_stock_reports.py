@@ -26,6 +26,7 @@ ROOT = Path(__file__).resolve().parents[1]
 TAIPEI = dt.timezone(dt.timedelta(hours=8))
 TWSE_URL = "https://mis.twse.com.tw/stock/api/getStockInfo.jsp"
 TPEX_ESB_URL = "https://www.tpex.org.tw/openapi/v1/tpex_esb_latest_statistics"
+TPEX_ESB_LIVE_URL = "https://www.tpex.org.tw/www/zh-tw/emerging/latest"
 EXPECTED_COUNTS = {"pandy": 142, "stock": 111, "prof": 95}
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (compatible; OdClawStockUpdater/1.0)",
@@ -126,8 +127,12 @@ def twse_quotes(codes: set[str]) -> dict[str, float]:
 
 
 def tpex_esb_quotes(codes: set[str]) -> dict[str, float]:
-    """Fetch emerging-stock prices from the official TPEx OpenAPI."""
+    """Prefer TPEx minute data; daily OpenAPI can still be yesterday at 13:50."""
     quotes: dict[str, float] = {}
+    try:
+        quotes.update(parse_tpex_live_quotes(request_json(TPEX_ESB_LIVE_URL, {"response": "json"}), codes))
+    except Exception as error:
+        print(f"TPEx minute source unavailable: {type(error).__name__}", file=sys.stderr)
     try:
         payload = request_json(TPEX_ESB_URL)
     except Exception:
@@ -138,13 +143,60 @@ def tpex_esb_quotes(codes: set[str]) -> dict[str, float]:
         if not isinstance(item, dict):
             continue
         code = str(item.get("SecuritiesCompanyCode") or "").strip()
-        if code not in codes:
+        if code not in codes or code in quotes:
             continue
-        for field in ("LatestPrice", "Average", "PreviousAveragePrice"):
+        # Keep dated reference only as an explicit fallback, never bid/ask.
+        raw = re.sub(r"\D", "", str(item.get("Date", "")))
+        if len(raw) == 7:
+            raw = str(int(raw[:3]) + 1911) + raw[3:]
+        try:
+            source_day = dt.datetime.strptime(raw, "%Y%m%d").date()
+        except ValueError:
+            continue
+        if source_day > dt.datetime.now(TAIPEI).date():
+            continue
+        for field in ("LatestPrice", "Average"):
             quote = as_float(str(item.get(field) or ""))
-            if quote is not None:
+            if quote is not None and quote > 0:
                 quotes[code] = quote
+                print(f"TPEx daily fallback {code}: source_date={source_day}", file=sys.stderr)
                 break
+    return quotes
+
+
+def parse_tpex_live_quotes(payload: Any, codes: set[str], *, now=None) -> dict[str, float]:
+    now = now or dt.datetime.now(TAIPEI)
+    quotes = {}
+    if not isinstance(payload, dict) or str(payload.get("stat", "")).lower() != "ok":
+        return quotes
+    for table in payload.get("tables", []):
+        if not isinstance(table, dict):
+            continue
+        match = re.fullmatch(r"(\d{3,4})年(\d{2})月(\d{2})日\s+(\d{2}):(\d{2}):(\d{2})", str(table.get("date", "")).strip())
+        if not match:
+            continue
+        parts = [int(x) for x in match.groups()]
+        if parts[0] < 1911:
+            parts[0] += 1911
+        try:
+            stamp = dt.datetime(*parts, tzinfo=TAIPEI)
+        except ValueError:
+            continue
+        if stamp > now + dt.timedelta(minutes=2):
+            continue
+        fields = table.get("fields", [])
+        if not all(f in fields for f in ("代號", "名稱", "成交", "成交量")):
+            continue
+        for row in table.get("data", []):
+            if not isinstance(row, list) or len(row) != len(fields):
+                continue
+            item = dict(zip(fields, row))
+            code = str(item['代號']).strip()
+            price = as_float(str(item['成交']))
+            volume = as_float(str(item['成交量']))
+            if code in codes and str(item['名稱']).strip() and price is not None and price > 0 and volume is not None and volume > 0:
+                quotes[code] = price
+        print(f"TPEx minute source: {stamp.isoformat()}; matched={len(quotes)}", file=sys.stderr)
     return quotes
 
 

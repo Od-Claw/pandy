@@ -366,6 +366,7 @@ def validate_inputs_and_quotes(
     quotes: dict[str, float],
     *,
     expected_pandy_count: int,
+    allow_missing_prices: bool = False,
 ) -> None:
     errors: list[str] = []
     if any(not isinstance(value, (int, float)) or isinstance(value, bool)
@@ -381,7 +382,7 @@ def validate_inputs_and_quotes(
             for entry in watchlists[key]
             if not entry.get("status") and (entry_quote(entry, quotes) is None or entry_quote(entry, quotes) <= 0)
         ]
-        if missing:
+        if missing and not allow_missing_prices:
             errors.append(f"{key} missing prices: {', '.join(missing)}")
 
     valid_prof_rows = [row for row in prof_rows if len(row) >= 9]
@@ -397,10 +398,23 @@ def validate_inputs_and_quotes(
         detail = "; ".join(f"{code}={','.join(names)}" for code, names in duplicates.items())
         errors.append(f"prof duplicate codes: {detail}")
     missing_prof = [row[1] for row in valid_prof_rows if quotes.get(row[0]) is None]
-    if missing_prof:
+    if missing_prof and not allow_missing_prices:
         errors.append(f"prof missing prices: {', '.join(missing_prof)}")
     if errors:
         raise RuntimeError("validation failed: " + " | ".join(errors))
+
+
+def missing_quote_details(watchlists: dict, prof_rows: list, quotes: dict) -> list[dict]:
+    """Public report diagnostics only; preserve every report row and its order."""
+    missing = []
+    groups = [(key + "_data.html", entries) for key, entries in watchlists.items() if key in ("pandy", "stock")]
+    groups.append(("prof_data.html", [{"code": r[0], "name": r[1]} for r in prof_rows if len(r) >= 9]))
+    for page, entries in groups:
+        for position, entry in enumerate(entries, 1):
+            if not entry.get("status") and entry_quote(entry, quotes) is None:
+                missing.append({"page": page, "position": position, "code": entry.get("code") or entry.get("symbol", ""),
+                                "name": entry["name"], "reason": "來源重試後仍未取得有效成交／參考價；原因未能由來源確認"})
+    return missing
 
 
 def page_shell(title: str, timestamp: str, count: int, unavailable: int, body: str) -> str:
@@ -533,6 +547,7 @@ def main() -> int:
         help="Validated exchange JSON exported by the exact-name Pandorabox board",
     )
     parser.add_argument("--dry-run", action="store_true", help="Fetch and render without writing files")
+    parser.add_argument("--allow-missing-prices", action="store_true", help="Publish unavailable quotes as -; retain structural and privacy validation")
     parser.add_argument("--quote-snapshot", type=Path, help="Dry-run saves validated quotes; generation reuses that exact snapshot for up to ten minutes")
     args = parser.parse_args()
     root = args.root.resolve()
@@ -557,6 +572,7 @@ def main() -> int:
         prof_rows,
         quotes,
         expected_pandy_count=len(watchlists["pandy"]),
+        allow_missing_prices=args.allow_missing_prices,
     )
     if args.quote_snapshot and args.dry_run:
         save_quote_snapshot(args.quote_snapshot, watchlists, prof_rows, quotes)
@@ -574,6 +590,7 @@ def main() -> int:
     print(json.dumps({
         "updated_at": timestamp,
         "quotes": len(quotes),
+        "missing_quotes": missing_quote_details(watchlists, prof_rows, quotes),
         "files": list(pages),
         "prof_code_corrections": corrections,
         "pandorabox_export_applied": export_applied,
